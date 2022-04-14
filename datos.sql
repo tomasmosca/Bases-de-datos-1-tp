@@ -1,0 +1,48 @@
+insert into comercio values(1,'Maxikiosco 365','Int.Becco 458','B1611FDA','11-4741-7580');
+						   insert into comercio values(2,'Farmacia 24hs','Av.Angel T. de Alvear 3250','B1643FDA','11-4723-9250');
+						   insert into comercio values(3,'Supermercado Lo de Claudio','Formosa 1967','B1619FDB','11-4845-6594');
+						   insert into comercio values(4,'El almacen de doña rosa','Acasusso 864','B1622FDA','11-3865-9941');
+						   insert into comercio values(5,'Ferreteria Gonzales','Estrada 320','B1611FDB','11-4078-4554');
+						   insert into comercio values(6,'Respuestos DIPA','Capilla del Señor 834','B1751FDA','11-4268-4600');
+						   insert into comercio values(7,'Suspension Ruben','Av. Eva Peron 1667','B1610FDB','11-4461-1194');
+						   insert into comercio values(8,'Montori e Hijos','Rivadavia 1156','B1827FDB','11-3221-4512');
+						   insert into comercio values(9,'Neumaticos Fernandez','Av. 9 de Julio 800','B1075FDA','11-5441-0221');
+						   insert into comercio values(10,'Joyas Laprida','Laprida 211','B1832FDA','11-5462-3497');
+						   insert into comercio values(11,'Papeleria La Feria','Av. Corrientes 834','B1681FDB','11-6262-2747');
+						   insert into comercio values(12,'Maxikiosco Martina','Las Violetas 2140','B1748FDA','11-1582-5847');
+						   insert into comercio values(13,'Farmacia Crl','Boulevar Caveri 1334','B1736IIO','11-2002-3053');
+						   insert into comercio values(14,'Supermercado La Feria','Av Entre Ríos 1072','B1121CEA','11-9212-2577');
+						   insert into comercio values(15,'Ferreteria La Feria','Esteban de Luca 2235','B1181FDB','11-1362-2817');
+						   insert into comercio values(16,'Pintureria Ambar','Av. Constituyentes 1204','B1617CDE','11-4740-6048');
+						   insert into comercio values(17,'Panaderia El Zorzal','Av. Constituyentes 1040','B1691FDB','11-1761-2897');
+						   insert into comercio values(18,'Ferreteria Liniers','Av. Liniers 1846','B1648DBL','11-4731-5930');
+						   insert into comercio values(19,'Kiosco Candy 24','Av. Sta. María 4711','B1812DCL','11-1821-6282');
+						   insert into comercio values(20,'Librería Arturo','Emilio Mitre 351','B1661TDB','11-3827-7217');
+
+						   insert into cliente values(30878666,'Sol','Palermo','Av E Shaw 121','022544831462');
+						   insert into cliente values(94538755,'Fonda','Rios','Brasil Oeste 4113','264427326438');
+						   insert into cliente values(86734897,'Grazia','Alvarez','Av Rivadavia 7266','011461193502');
+						   insert into cliente values(34494968,'Patricia','Perez','Sastre Marcos 33123','114504171323');
+						   insert into cliente values(32873620,'Angelino','Martin','San Martin 1996','385439131151');
+					   	   insert into cliente values(37606436,'Florencia','Medina','Chacabuco 1267','023204154691');
+						   insert into cliente values(38099826,'Matias','Perez','Av. Mitre 412','023204881278');
+						   insert into cliente values(40425321,'Lucas','Armando','Jose M. Gutierrez 1541','023254345152');
+						   insert into cliente values(25501234,'Maria','Caceres','Callao 1522','023204253421');
+						   insert into cliente values(20341579,'Natalia','Colman','Mario Bravo 350','023204550788');
+						   insert into cliente values(32372285,'Dionisa','Bravo','Pte B Mitre 385','029944700993');
+						   insert into cliente values(51301792,'Rosario','Pellegrini','Hipolito Irigoyen 3476','342453010367');
+						   insert into cliente values(95249665,'Ella','Torres','Riobamba 7110','341482395843');
+						   insert into cliente values(21600249,'Adrían','Sánchez','Santa Fe Avda 16102','114812042216');
+						   insert into cliente values(86497599,'Micaela','Cruz','Jujuy 1378','291455710682');
+						   insert into cliente values(42226235,'Tomas','Arce','Neuquen 498','11-4993-3372');
+						   insert into cliente values(42013792,'Nicolas','Arias','Av. Rivadavia 7652','11-2895-4664');
+						   insert into cliente values(41768622,'Carla','Cabrera','Nicolas avellaneda 225','11-6537-7397');
+						   insert into cliente values(20317620,'Juan','Vaccaro','Mariano Pelliza 7895','11-5719-9847');
+						   insert into cliente values(17305474,'Carlos','Durante','Obarrio 122','11-8559-4879');
+
+						   insert into tarjeta values(1234567890123456, 30878666, '201106','202208','4554',200.00, 'vigente');
+						   insert into tarjeta values(1234567890123457, 30878666, '201106','202208','4554',200.00, 'suspendida');
+						   insert into tarjeta values(1234567890123458, 30878666, '201106','202208','4554',200.00, 'anulada');
+						   insert into tarjeta values(1234567890123459, 30878666, '201106','202105','4554',200.00, 'vigente');
+
+						   insert into compra values(1, 1234567890123456, 1,'2021-11-04 19:10:25-7',100.00, false);

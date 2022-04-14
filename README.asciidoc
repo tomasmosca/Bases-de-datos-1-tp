@@ -1,0 +1,793 @@
+= Trabajo Práctico Bases de Datos I − Segundo Semestre 2021 
+ Juan_Cruz Carrizo <carrizojuancruz@gmail.com>; Tomas Moscarelli <tomasmoscarelli@hotmail.com>; Jano Siccardi <janosiccardi99@gmail.com>;
+v1, {docdate}
+:toc: 
+:toc-title: Contenidos
+:numbered: 
+:source-highlighter: coderay
+:tabsize: 4
+
+ 
+== Introducción 
+Este trabajo consiste en la creación de una base de datos que almacena información relativa a tarjetas de crédito. Se utilizó el sistema de gestión de bases de datos PostgreSQL para la generación de dicha base de datos y el lenguaje de programación GO para la creación de una aplicación CLI desde donde se pueden ejecutar las acciones necesarias para la generación de las tablas, stored procedures, carga de datos  y testeo de funcionalidades. 
+ 
+== Descripción 
+El diseño elegido fue el de desplegar en primera instancia una lista de opciones donde el usuario pueda elegir una de ellas. 
+
+Las opciones a elegir son:
+    
+    1. Crear base de datos.
+    2. Crear tablas.
+    3. Crear PKs y FKs.
+    4. Cargar tablas.
+    5. Crear Stored Procedures y Triggers.
+    6. Generar compras a partir de tabla consumo.
+    7. Generar resumenes.
+    8. Crear BD NoSQL y cargar datos.
+    9. Borrar PKs y FKs.
+    0. Salir.
+
+A la hora del desarrollo, en principio, se generaron las tablas pertinentes con sus respectivas columnas a partir de scripts SQL. Luego, se analizó el modelo de datos aportado como consigna en el tp y en base al mismo se creó otro script SQL que se encarga de establecer las PK y FK de cada tabla. 
+Paralelamente, se cargaron datos en la tabla __cliente__ y en la tabla __comercio__ hasta totalizar 20 de cada uno. (dichos datos eran cargados mediante otro script SQL) 
+Siguiente a esto, se crearon los Stored Procedures requeridos para ejecutar la lógica de negocio, comenzando por __autorizar_compra__, __alerta_compra__ y __gen_resumen__. Y luego los Triggers que fueron __alerta_trigger_rechazo__ y __alerta_trigger_compra__.
+
+Uno de los problemas que nos encontramos fue en el SP __autorizar_compra__ debido a que la fecha de validez de la tarjeta (la cual necesitamos para comprobar si la tarjeta esta vencida) está ingresada como char, esto se resolvió utilizando la función de postgreSQL *to_date* que se encarga de transformar el char a date.
+
+Por otro lado, también se nos presentó un incoveniente a la hora de insertar un id secuencial para cada registro nuevo. Se resolvió colocando una consulta antes de cada insersión donde verifica el *MAX* id de cada tabla (si está vacia colocarle un 0) y sumarle 1 para que se ingrese con el id siguiente y así poder ser único en la tabla.
+
+Para probar los triggers se decició en crear un archivo go llamado ProbarTriggers() que servía para insertar diferentes tipos de compras o rechazos y así poder comprobar el funcionamiento de una manera más dinámica. Esta opción fue agregada en el menú principal para poder ejecutarla. A raiz de esto, nos surgió la duda de como hacer para que los archivos se llamen unos a otros trabajando en SQL sobre GO y lo hicimos colocando todos en una misma carpeta y con el comando **go run *.go** para ejecutar el main.
+
+Para las pruebas de este ejercicio, hicimos un archivo llamado _mostrarNombres.go_ que nos visualizaba desde el menú todos los nombres de los comercios.
+ 
+== Implementación
+
+=== Archivo main.go
+Este archivo es el encargado de unificar las distintas funciones, donde se ejecuta el programa y se le muestra al usuario un listado de opciones y este elige una.
+
+.menu()
+El metodo "menu()" se encarga de limpiar la consola y mostrar el listado de opciones y espera que el usuario ingrese un numero para luego llamar al metodo "elegirOpcion()".
+[source, go]
+----
+func menu() {
+	fmt.Print("\033[H\033[2J")  //limpia la consola y muestra las opciones en pantalla
+	var opcionElegida int
+	fmt.Printf("------------- ELIGA UNA OPCION ------------- \n\n")
+	fmt.Printf("1- Crear base de datos \n")
+	fmt.Printf("2- Crear tablas \n")
+	fmt.Printf("3- Crear PKs y FKs \n")
+	fmt.Printf("4- Cargar tablas \n")
+	fmt.Printf("5- Crear Stored Procedures y Triggers \n")
+	fmt.Printf("6- Generar compras a partir de tabla consumo\n")
+	fmt.Printf("7- Generar resumenes\n")
+	fmt.Printf("8- Crear BD NoSQL y cargar datos\n")
+	fmt.Printf("9- Borrar PKs y FKs\n")
+	fmt.Printf("0- Salir \n\n")
+	fmt.Printf("Eliga una opcion: ")
+	fmt.Scanf("%d", &opcionElegida)
+	elegirOpcion(opcionElegida)
+}
+----
+
+
+.elegirOpcion()
+Este metodo recibe un digito y ejecuta una funcion de otro archivo .go dependiendo de que opcion es elegida y al finalizar llama al metodo "salir()" luego de informar al usuario que si desea salir debe presionar la tecla 0
+
+[source, go]
+----
+func elegirOpcion(opcionElegida int) { //se ejecuta una funcion dependiendo la opcion elegida
+	fmt.Print("\033[H\033[2J")
+	if opcionElegida == 1 {
+		CrearBase()
+	}
+	if opcionElegida == 2 {
+		CrearTablas()
+	}
+	if opcionElegida == 3 {
+		CrearKeys()
+	}
+	if opcionElegida == 4 {
+		CargarTablas()
+	}
+	if opcionElegida == 5 {
+		CrearSpTriggers()
+	}
+	if opcionElegida == 6 {
+		GenerarCompras()
+	}
+	if opcionElegida == 7 {
+		GenerarResumenes()
+	}
+	if opcionElegida == 8 {
+		CrearDB()
+	}
+	if opcionElegida == 9 {
+		BorrarKeys()
+	}
+
+	if opcionElegida != 0 {
+		fmt.Printf("\nPresione 0 para volver al menu \n")
+		salir()
+	}
+}
+----
+
+.salir()
+Este metodo se queda esperando que el usuario ingrese el numero 0 para volver al menu.
+
+[source, go]
+----
+func salir() {  //se queda esperando que se ingrese el numero 0 para volver al menu
+	var opcionElegida int
+	fmt.Scanf("%d", &opcionElegida)
+	if opcionElegida == 0 {
+		menu()
+	} else {
+		salir()
+	}
+}
+----
+
+
+=== Archivo crearBase.go
+Este archivo se encarga de brindar el metodo "CrearBase()" como metodo principal el cual se conecta a la base "postgres" y desde ella crea la base "gestiontarjetas" donde se trabajara luego. En el caso de error mostrar en consola el problema.
+
+[source, go]
+----
+func CrearBase() {
+	db, err := sql.Open("postgres", "user=postgres host=localhost dbname=postgres sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		_, err := db.Exec(`drop database if exists gestiontarjetas;`)
+		if err != nil {
+			log.Fatal(err)
+
+		} else {
+			_, err := db.Exec(`create database gestiontarjetas;`)
+			if err != nil {
+				log.Fatal(err)
+			} else {
+				fmt.Printf("\n ------------- BASE CREADA -------------\n\n")
+			}
+		}
+	}
+}
+----
+
+=== Archivo crearTablas.go
+En este archivo go se ejecuta un comando sql donde se crean las tablas correspondientes y muestra en consola en el caso de excepcion.
+
+[source, go]
+----
+func CrearTablas() {
+	db, err := sql.Open("postgres", "user=postgres host=localhost dbname=gestiontarjetas sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		_, err := db.Exec(`create table cliente(nrocliente int, nombre text, apellido text, domicilio text, telefono char(12));
+						   create table tarjeta(nrotarjeta char(16), nrocliente int, validadesde char(6), validahasta char(6), codseguridad char(4), limitecompra decimal(8,2), estado char(10));
+						   create table comercio(nrocomercio int, nombre text, domicilio text, codigopostal char(8), telefono char(12));
+						   create table detalle(nroresumen int, nrolinea int, fecha date, nombrecomercio text, monto decimal(7,2));
+						   create table cierre(año int, mes int, terminacion int, fechainicio date, fechacierre date, fechavto date);
+						   create table compra(nrooperacion int, nrotarjeta char(16), nrocomercio int, fecha timestamp, monto decimal(7,2), pagado boolean);
+						   create table cabecera(nroresumen int, nombre text, apellido text, domicilio text, nrotarjeta char(16), desde date, hasta date, vence date, total decimal(8,2));
+						   create table consumo(nrotarjeta char(16), codseguridad char(4), nrocomercio int, monto decimal(7,2));
+						   create table rechazo(nrorechazo int, nrotarjeta char(16), nrocomercio int, fecha timestamp, monto decimal(7,2), motivo text);
+						   create table alerta(nroalerta int, nrotarjeta char(16), fecha timestamp, nrorechazo int, codalerta int, descripcion text);`)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			fmt.Printf("\n------------- TABLAS CREADAS -------------\n")
+		}
+
+	}
+}
+
+----
+
+=== Archivo cargarTablas.go
+Archivo que brinda la funcion "CargarTablas()"  el cual se encarga de conectarse a la base creada previamente y cargar datos en las tablas creadas y en el caso de excepcion la muestra por consola.
+
+
+[source, go]
+----
+
+func CargarTablas() {
+	db, err := sql.Open("postgres", "user=postgres host=localhost dbname=gestiontarjetas sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		_, err := db.Exec(`insert into comercio values(1,'Maxikiosco 365','Int.Becco 458','B1611FDA','11-4741-7580');
+						   insert into comercio values(2,'Farmacia 24hs','Av.Angel T. de Alvear 3250','B1611FDA','11-4723-9250');
+						   insert into comercio values(3,'Supermercado Lo de Claudio','Formosa 1967','B1619FDB','11-4845-6594');
+						   insert into comercio values(4,'El almacen de doña rosa','Acasusso 864','B1622FDA','11-3865-9941');
+						   insert into comercio values(5,'Ferreteria Gonzales','Estrada 320','B1611FDB','11-4078-4554');
+						   insert into comercio values(6,'Respuestos DIPA','Capilla del Señor 834','B1751FDA','11-4268-4600');
+						   insert into comercio values(7,'Suspension Ruben','Av. Eva Peron 1667','B1610FDB','11-4461-1194');
+						   insert into comercio values(8,'Montori e Hijos','Rivadavia 1156','B1827FDB','11-3221-4512');
+						   insert into comercio values(9,'Neumaticos Fernandez','Av. 9 de Julio 800','B1075FDA','11-5441-0221');
+						   insert into comercio values(10,'Joyas Laprida','Laprida 211','B1832FDA','11-5462-3497');
+						   insert into comercio values(11,'Papeleria La Feria','Av. Corrientes 834','B1681FDB','11-6262-2747');
+						   insert into comercio values(12,'Maxikiosco Martina','Las Violetas 2140','B1748FDA','11-1582-5847');
+						   insert into comercio values(13,'Farmacia Crl','Boulevar Caveri 1334','B1736IIO','11-2002-3053');
+						   insert into comercio values(14,'Supermercado La Feria','Av Entre Ríos 1072','B1121CEA','11-9212-2577');
+						   insert into comercio values(15,'Ferreteria La Feria','Esteban de Luca 2235','B1181FDB','11-1362-2817');
+						   insert into comercio values(16,'Pintureria Ambar','Av. Constituyentes 1204','B1617CDE','11-4740-6048');
+						   insert into comercio values(17,'Panaderia El Zorzal','Av. Constituyentes 1040','B1691FDB','11-1761-2897');
+						   insert into comercio values(18,'Ferreteria Liniers','Av. Liniers 1846','B1648DBL','11-4731-5930');
+						   insert into comercio values(19,'Kiosco Candy 24','Av. Sta. María 4711','B1812DCL','11-1821-6282');
+						   insert into comercio values(20,'Librería Arturo','Emilio Mitre 351','B1661TDB','11-3827-7217');
+
+						   insert into cliente values(30878666,'Sol','Palermo','Av E Shaw 121','11-6543-5234');
+						   insert into cliente values(94538755,'Fonda','Rios','Brasil Oeste 4113','11-7632-7754');
+						   insert into cliente values(86734897,'Grazia','Alvarez','Av Rivadavia 7266','11-8964-2314');
+						   insert into cliente values(34494968,'Patricia','Perez','Sastre Marcos 33123','11-7696-9980');
+						   insert into cliente values(32873620,'Angelino','Martin','San Martin 1996','11-3411-9778');
+						   insert into cliente values(37606436,'Florencia','Medina','Chacabuco 1267','11-7590-4221');
+						   insert into cliente values(38099826,'Matias','Perez','Av. Mitre 412','11-5543-0098');
+						   insert into cliente values(40425321,'Lucas','Armando','Jose M. Gutierrez 1541','11-3533-6766');
+						   insert into cliente values(25501234,'Maria','Caceres','Callao 1522','11-4521-2421');
+						   insert into cliente values(20341579,'Natalia','Colman','Mario Bravo 350','11-3855-7764');
+						   insert into cliente values(32372285,'Dionisa','Bravo','Pte B Mitre 385','11-3127-1121');
+						   insert into cliente values(51301792,'Rosario','Pellegrini','Hipolito Irigoyen 3476','11-9911-8676');
+						   insert into cliente values(95249665,'Ella','Torres','Riobamba 7110','11-5521-2231');
+						   insert into cliente values(21600249,'Adrían','Sánchez','Santa Fe Avda 16102','11-4300-7882');
+						   insert into cliente values(86497599,'Micaela','Cruz','Jujuy 1378','11-2932-1010');
+						   insert into cliente values(42226235,'Tomas','Arce','Neuquen 498','11-4993-3372');
+						   insert into cliente values(42013792,'Nicolas','Arias','Av. Rivadavia 7652','11-2895-4664');
+						   insert into cliente values(41768622,'Carla','Cabrera','Nicolas avellaneda 225','11-6537-7397');
+						   insert into cliente values(20317620,'Juan','Vaccaro','Mariano Pelliza 7895','11-5719-9847');
+						   insert into cliente values(17305474,'Carlos','Durante','Obarrio 122','11-8559-4879');
+
+						   insert into cierre values(2021,01,0,'2020-12-17','2021-01-16','2021-02-05');
+						   insert into cierre values(2021,01,1,'2020-12-18','2021-01-17','2021-02-06');
+						   insert into cierre values(2021,01,2,'2020-12-19','2021-01-18','2021-02-07');
+						   insert into cierre values(2021,01,3,'2020-12-20','2021-01-19','2021-02-08');
+						   insert into cierre values(2021,01,4,'2020-12-21','2021-01-20','2021-02-09');
+						   insert into cierre values(2021,01,5,'2020-12-22','2021-01-21','2021-02-10');
+						   insert into cierre values(2021,01,6,'2020-12-23','2021-01-22','2021-02-11');
+						   insert into cierre values(2021,01,7,'2020-12-24','2021-01-23','2021-02-12');
+						   insert into cierre values(2021,01,8,'2020-12-25','2021-01-24','2021-02-13');
+						   insert into cierre values(2021,01,9,'2020-12-26','2021-01-25','2021-02-14');
+						   insert into cierre values(2021,02,0,'2021-01-17','2021-02-16','2021-03-05');
+						   insert into cierre values(2021,02,1,'2021-01-18','2021-02-17','2021-03-06');
+						   insert into cierre values(2021,02,2,'2021-01-19','2021-02-18','2021-03-07');
+						   insert into cierre values(2021,02,3,'2021-01-20','2021-02-19','2021-03-08');
+						   insert into cierre values(2021,02,4,'2021-01-21','2021-02-20','2021-03-09');
+						   insert into cierre values(2021,02,5,'2021-01-22','2021-02-21','2021-03-10');
+						   insert into cierre values(2021,02,6,'2021-01-23','2021-02-22','2021-03-11');
+						   insert into cierre values(2021,02,7,'2021-01-24','2021-02-23','2021-03-12');
+						   insert into cierre values(2021,02,8,'2021-01-25','2021-02-24','2021-03-13');
+						   insert into cierre values(2021,02,9,'2021-01-26','2021-02-25','2021-03-14');
+						   insert into cierre values(2021,03,0,'2021-02-17','2021-03-16','2021-04-05');
+						   insert into cierre values(2021,03,1,'2021-02-18','2021-03-17','2021-04-06');
+						   insert into cierre values(2021,03,2,'2021-02-19','2021-03-18','2021-04-07');
+						   insert into cierre values(2021,03,3,'2021-02-20','2021-03-19','2021-04-08');
+						   insert into cierre values(2021,03,4,'2021-02-21','2021-03-20','2021-04-09');
+						   insert into cierre values(2021,03,5,'2021-02-22','2021-03-21','2021-04-10');
+						   insert into cierre values(2021,03,6,'2021-02-23','2021-03-22','2021-04-11');
+						   insert into cierre values(2021,03,7,'2021-02-24','2021-03-23','2021-04-12');
+						   insert into cierre values(2021,03,8,'2021-02-25','2021-03-24','2021-04-13');
+						   insert into cierre values(2021,03,9,'2021-02-26','2021-03-25','2021-04-14');
+						   insert into cierre values(2021,04,0,'2021-03-17','2021-04-16','2021-05-05');
+						   insert into cierre values(2021,04,1,'2021-03-18','2021-04-17','2021-05-06');
+						   insert into cierre values(2021,04,2,'2021-03-19','2021-04-18','2021-05-07');
+						   insert into cierre values(2021,04,3,'2021-03-20','2021-04-19','2021-05-08');
+						   insert into cierre values(2021,04,4,'2021-03-21','2021-04-20','2021-05-09');
+						   insert into cierre values(2021,04,5,'2021-03-22','2021-04-21','2021-05-10');
+						   insert into cierre values(2021,04,6,'2021-03-23','2021-04-22','2021-05-11');
+						   insert into cierre values(2021,04,7,'2021-03-24','2021-04-23','2021-05-12');
+						   insert into cierre values(2021,04,8,'2021-03-25','2021-04-24','2021-05-13');
+						   insert into cierre values(2021,04,9,'2021-03-26','2021-04-25','2021-05-14');
+						   insert into cierre values(2021,05,0,'2021-04-17','2021-05-16','2021-06-05');
+						   insert into cierre values(2021,05,1,'2021-04-18','2021-05-17','2021-06-06');
+						   insert into cierre values(2021,05,2,'2021-04-19','2021-05-18','2021-06-07');
+						   insert into cierre values(2021,05,3,'2021-04-20','2021-05-19','2021-06-08');
+						   insert into cierre values(2021,05,4,'2021-04-21','2021-05-20','2021-06-09');
+						   insert into cierre values(2021,05,5,'2021-04-22','2021-05-21','2021-06-10');
+						   insert into cierre values(2021,05,6,'2021-04-23','2021-05-22','2021-06-11');
+						   insert into cierre values(2021,05,7,'2021-04-24','2021-05-23','2021-06-12');
+						   insert into cierre values(2021,05,8,'2021-04-25','2021-05-24','2021-06-13');
+						   insert into cierre values(2021,05,9,'2021-04-26','2021-05-25','2021-06-14');
+						   insert into cierre values(2021,06,0,'2021-05-17','2021-06-16','2021-07-05');
+						   insert into cierre values(2021,06,1,'2021-05-18','2021-06-17','2021-07-06');
+						   insert into cierre values(2021,06,2,'2021-05-19','2021-06-18','2021-07-07');
+						   insert into cierre values(2021,06,3,'2021-05-20','2021-06-19','2021-07-08');
+						   insert into cierre values(2021,06,4,'2021-05-21','2021-06-20','2021-07-09');
+						   insert into cierre values(2021,06,5,'2021-05-22','2021-06-21','2021-07-10');
+						   insert into cierre values(2021,06,6,'2021-05-23','2021-06-22','2021-07-11');
+						   insert into cierre values(2021,06,7,'2021-05-24','2021-06-23','2021-07-12');
+						   insert into cierre values(2021,06,8,'2021-05-25','2021-06-24','2021-07-13');
+						   insert into cierre values(2021,06,9,'2021-05-26','2021-06-25','2021-07-14');
+						   insert into cierre values(2021,07,0,'2021-06-17','2021-07-16','2021-08-05');
+						   insert into cierre values(2021,07,1,'2021-06-18','2021-07-17','2021-08-06');
+						   insert into cierre values(2021,07,2,'2021-06-19','2021-07-18','2021-08-07');
+						   insert into cierre values(2021,07,3,'2021-06-20','2021-07-19','2021-08-08');
+						   insert into cierre values(2021,07,4,'2021-06-21','2021-07-20','2021-08-09');
+						   insert into cierre values(2021,07,5,'2021-06-22','2021-07-21','2021-08-10');
+						   insert into cierre values(2021,07,6,'2021-06-23','2021-07-22','2021-08-11');
+						   insert into cierre values(2021,07,7,'2021-06-24','2021-07-23','2021-08-12');
+						   insert into cierre values(2021,07,8,'2021-06-25','2021-07-24','2021-08-13');
+						   insert into cierre values(2021,07,9,'2021-06-26','2021-07-25','2021-08-14');
+						   insert into cierre values(2021,08,0,'2021-07-17','2021-08-16','2021-09-05');
+						   insert into cierre values(2021,08,1,'2021-07-18','2021-08-17','2021-09-06');
+						   insert into cierre values(2021,08,2,'2021-07-19','2021-08-18','2021-09-07');
+						   insert into cierre values(2021,08,3,'2021-07-20','2021-08-19','2021-09-08');
+						   insert into cierre values(2021,08,4,'2021-07-21','2021-08-20','2021-09-09');
+						   insert into cierre values(2021,08,5,'2021-07-22','2021-08-21','2021-09-10');
+						   insert into cierre values(2021,08,6,'2021-07-23','2021-08-22','2021-09-11');
+						   insert into cierre values(2021,08,7,'2021-07-24','2021-08-23','2021-09-12');
+						   insert into cierre values(2021,08,8,'2021-07-25','2021-08-24','2021-09-13');
+						   insert into cierre values(2021,08,9,'2021-07-26','2021-08-25','2021-09-14');
+						   insert into cierre values(2021,09,0,'2021-08-17','2021-09-16','2021-10-05');
+						   insert into cierre values(2021,09,1,'2021-08-18','2021-09-17','2021-10-06');
+						   insert into cierre values(2021,09,2,'2021-08-19','2021-09-18','2021-10-07');
+						   insert into cierre values(2021,09,3,'2021-08-20','2021-09-19','2021-10-08');
+						   insert into cierre values(2021,09,4,'2021-08-21','2021-09-20','2021-10-09');
+						   insert into cierre values(2021,09,5,'2021-08-22','2021-09-21','2021-10-10');
+						   insert into cierre values(2021,09,6,'2021-08-23','2021-09-22','2021-10-11');
+						   insert into cierre values(2021,09,7,'2021-08-24','2021-09-23','2021-10-12');
+						   insert into cierre values(2021,09,8,'2021-08-25','2021-09-24','2021-10-13');
+						   insert into cierre values(2021,09,9,'2021-08-26','2021-09-25','2021-10-14');
+						   insert into cierre values(2021,10,0,'2021-09-17','2021-10-16','2021-11-05');
+						   insert into cierre values(2021,10,1,'2021-09-18','2021-10-17','2021-11-06');
+						   insert into cierre values(2021,10,2,'2021-09-19','2021-10-18','2021-11-07');
+						   insert into cierre values(2021,10,3,'2021-09-20','2021-10-19','2021-11-08');
+						   insert into cierre values(2021,10,4,'2021-09-21','2021-10-20','2021-11-09');
+						   insert into cierre values(2021,10,5,'2021-09-22','2021-10-21','2021-11-10');
+						   insert into cierre values(2021,10,6,'2021-09-23','2021-10-22','2021-11-11');
+						   insert into cierre values(2021,10,7,'2021-09-24','2021-10-23','2021-11-12');
+						   insert into cierre values(2021,10,8,'2021-09-25','2021-10-24','2021-11-13');
+						   insert into cierre values(2021,10,9,'2021-09-26','2021-10-25','2021-11-14');
+						   insert into cierre values(2021,11,0,'2021-10-17','2021-11-16','2021-12-05');
+						   insert into cierre values(2021,11,1,'2021-10-18','2021-11-17','2021-12-06');
+						   insert into cierre values(2021,11,2,'2021-10-19','2021-11-18','2021-12-07');
+						   insert into cierre values(2021,11,3,'2021-10-20','2021-11-19','2021-12-08');
+						   insert into cierre values(2021,11,4,'2021-10-21','2021-11-20','2021-12-09');
+						   insert into cierre values(2021,11,5,'2021-10-22','2021-11-21','2021-12-10');
+						   insert into cierre values(2021,11,6,'2021-10-23','2021-11-22','2021-12-11');
+						   insert into cierre values(2021,11,7,'2021-10-24','2021-11-23','2021-12-12');
+						   insert into cierre values(2021,11,8,'2021-10-25','2021-11-24','2021-12-13');
+						   insert into cierre values(2021,11,9,'2021-10-26','2021-11-25','2021-12-14');
+						   insert into cierre values(2021,12,0,'2021-11-17','2021-12-16','2022-01-05');
+						   insert into cierre values(2021,12,1,'2021-11-18','2021-12-17','2022-01-06');
+						   insert into cierre values(2021,12,2,'2021-11-19','2021-12-18','2022-01-07');
+						   insert into cierre values(2021,12,3,'2021-11-20','2021-12-19','2022-01-08');
+						   insert into cierre values(2021,12,4,'2021-11-21','2021-12-20','2022-01-09');
+						   insert into cierre values(2021,12,5,'2021-11-22','2021-12-21','2022-01-10');
+						   insert into cierre values(2021,12,6,'2021-11-23','2021-12-22','2022-01-11');
+						   insert into cierre values(2021,12,7,'2021-11-24','2021-12-23','2022-01-12');
+						   insert into cierre values(2021,12,8,'2021-11-25','2021-12-24','2022-01-13');
+						   insert into cierre values(2021,12,9,'2021-11-26','2021-12-25','2022-01-14');
+
+						   insert into tarjeta values('5449981007097362', 30878666, '201812','202312','0810',80000.00, 'vigente');
+						   insert into tarjeta values('5215587392715740', 30878666, '201212','202112','0546',8000.00, 'anulada');
+						   insert into tarjeta values('5210983186476711', 94538755, '202008','202508','0251',40000.00, 'vigente');
+						   insert into tarjeta values('5245646358674806', 94538755, '201508','202408','0133',20000.00, 'anulada');
+						   insert into tarjeta values('4927053520951527', 86734897, '202101','202701','0521',10000.00, 'suspendida');
+						   insert into tarjeta values('4024813453580367', 34494968, '201710','202010','0251',30000.00, 'vigente');
+						   insert into tarjeta values('5288428075974845', 32873620, '201811','201911','0117',35000.00, 'vigente');
+						   insert into tarjeta values('4554207750976410', 37606436, '202006','202106','0178',90000.00, 'vigente');
+						   insert into tarjeta values('5267469005021351', 38099826, '201910','202310','0378',50000.00, 'suspendida');
+						   insert into tarjeta values('5299857355514060', 40425321, '201512','202112','0635',45000.00, 'vigente');
+						   insert into tarjeta values('5289102401524975', 25501234, '201803','202203','0635',120000.00, 'vigente');
+						   insert into tarjeta values('4495639786262423', 20341579, '202009','202409','0508',100000.00, 'vigente');
+						   insert into tarjeta values('4422834927230484', 32372285, '202109','202509','0986',70000.00, 'suspendida');
+						   insert into tarjeta values('4403651796135247', 51301792, '201802','202202','0708',75000.00, 'vigente');
+						   insert into tarjeta values('3558880738242960', 95249665, '201512','202112','0217',95000.00, 'suspendida');
+						   insert into tarjeta values('3538264985639241', 21600249, '201908','202408','0351',180000.00, 'vigente');
+						   insert into tarjeta values('3529559193777084', 86497599, '201703','202203','0252',60000.00, 'anulada');
+						   insert into tarjeta values('5577163024783704', 42226235, '201605','202205','0872',100000.00, 'vigente');
+						   insert into tarjeta values('5201262513928574', 42013792, '201808','202308','0479',90000.00, 'suspendida');
+						   insert into tarjeta values('4191297487611553', 41768622, '201910','202310','0479',85000.00, 'vigente');
+						   insert into tarjeta values('4567240522998854', 20317620, '201907','202207','0756',120000.00, 'suspendida');
+						   insert into tarjeta values('4658368747812582', 17305474, '201706','202406','0755',110000.00, 'vigente');						   				   
+					   
+
+						   insert into consumo values('5449981007097362','0810',2,50000);
+						   insert into consumo values('5210983186476711','0251',1,3000);
+						   insert into consumo values('4658368747812582','0755',5,11500);
+						  
+						   insert into consumo values('4658358747812582','0755',5,1800);
+						   								   
+						   insert into consumo values('3529559193777084','0252',17,2600);
+					  							   
+						   insert into consumo values('3558880738242960','0217',4,9650);
+						  
+						   insert into consumo values('4658368747812582','8755',5,11500);
+
+						   insert into consumo values('4554207750976410','0178',9,9000);
+						   
+						   insert into consumo values('5449981007097362','0810',3,40000);
+						   insert into consumo values('5449981007097362','0810',1,1000);
+						   insert into consumo values('5210983186476711','0251',4,6000);
+						   `)
+
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			fmt.Printf("\n------------- TABLAS CARGADAS -------------\n")
+		}
+
+	}
+}
+
+----
+
+=== Archivo crearKeys.go
+En este archivo se encuentra la funcion CrearKeys() la cual se conecta a la base "gestiontarjetas" y luego crea las Primary Keys y Foreign Keys de cada tabla. Si hay una excepcion la muestra por consola.
+
+[source, go]
+
+----
+func CrearKeys() {
+	db, err := sql.Open("postgres", "user=postgres host=localhost dbname=gestiontarjetas sslmode=disable")
+	_, err = db.Exec(`alter table cliente   add constraint cliente_pk    primary key (nrocliente);
+						alter table tarjeta   add constraint tarjeta_pk    primary key (nrotarjeta);
+						alter table comercio  add constraint comercio_pk    primary key (nrocomercio);
+						alter table detalle   add constraint detalle_pk    primary key (nroresumen, nrolinea);
+						alter table cierre   add constraint cierre_pk      primary key (año, mes, terminacion);
+						alter table rechazo add constraint rechazo_pk      primary key (nrorechazo);
+						alter table alerta add constraint alerta_pk      primary key (nroalerta);
+						alter table compra add constraint compra_pk      primary key (nrooperacion);
+						alter table cabecera add constraint cabecera_pk      primary key (nroresumen);
+						alter table tarjeta add constraint tarjeta_nrocliente_fk foreign key (nrocliente) references cliente(nrocliente);
+						alter table compra add constraint compra_nrocomercio_fk foreign key (nrocomercio) references comercio(nrocomercio);
+						alter table compra add constraint compra_nrotarjeta_fk foreign key (nrotarjeta) references tarjeta(nrotarjeta);
+						alter table rechazo add constraint rechazo_nrocomercio_fk foreign key (nrocomercio) references comercio(nrocomercio);				
+						alter table cabecera add constraint cabecera_nrotarjeta_fk foreign key (nrotarjeta) references tarjeta(nrotarjeta);
+						alter table detalle add constraint detalle_nroresumen_fk foreign key (nroresumen) references cabecera(nroresumen);
+						alter table alerta add constraint alerta_nrorechazo_fk foreign key (nrorechazo) references rechazo(nrorechazo);`)
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		fmt.Printf("------------- SE CREARON PKs y FKs -------------\n")
+	}
+}
+----
+
+=== Archivo borrarKeys.go
+En este archivo se encuentra la funcion BorrarKeys() la cual se conecta a la base de datos y luego borra las keys comenzando primero por las foreign keys y luego las primary keys. Si hay una excepcion la muestra por consola.
+
+[source, go]
+----
+func BorrarKeys() {
+	db, err := sql.Open("postgres", "user=postgres host=localhost dbname=gestiontarjetas sslmode=disable")
+	_, err = db.Exec(`alter table tarjeta drop constraint tarjeta_nrocliente_fk;
+						alter table compra drop constraint compra_nrocomercio_fk;
+						alter table compra drop constraint compra_nrotarjeta_fk;
+						alter table rechazo drop constraint rechazo_nrocomercio_fk;
+						alter table cabecera drop constraint cabecera_nrotarjeta_fk;
+						alter table detalle drop constraint detalle_nroresumen_fk;
+						alter table alerta drop constraint alerta_nrorechazo_fk;
+						alter table cliente   drop constraint cliente_pk;
+						alter table tarjeta   drop constraint tarjeta_pk;
+						alter table comercio  drop constraint comercio_pk;
+						alter table detalle   drop constraint detalle_pk;
+						alter table cierre   drop constraint cierre_pk;
+						alter table rechazo drop constraint rechazo_pk;
+						alter table alerta drop constraint alerta_pk;
+						alter table compra drop constraint compra_pk;
+						alter table cabecera drop constraint cabecera_pk;`)
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		fmt.Printf("------------- SE BORRARON PKs y FKs -------------\n")
+	}
+}
+----
+
+=== Archivo crearSpTriggers.go
+En este archivo se encuentra la funcion CrearSpTriggers() la cual se conecta a la base de datos y luego crea los sp de la autorizacion de compras y la generacion del resumen, asi como tambien las alertas que se producen en los rechazos.
+
+[source, go]
+
+----
+func CrearSpTriggers() {
+	db, err := sql.Open("postgres", "user=postgres host=localhost dbname=gestiontarjetas sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		_, err := db.Exec(`
+create or replace function autorizar_compra(nrotarjeta_ char, codseguridad_ char, nrocomercio_ int, monto_ decimal) returns boolean as $$
+declare
+    datos_tarjeta record;
+	ultimo_rechazo int;	
+begin
+	select * into datos_tarjeta from tarjeta t1 where nrotarjeta_ = t1.nrotarjeta;
+	if not found or datos_tarjeta.estado = 'anulada' then
+		select coalesce(max(r1.nrorechazo),0) into ultimo_rechazo from rechazo r1;
+		insert into rechazo values(ultimo_rechazo+1, nrotarjeta_, nrocomercio_, current_date, monto_, 'tarjeta no válida ó no vigente');
+		return false;
+	elsif datos_tarjeta.estado = 'suspendida' then
+		select coalesce(max(r1.nrorechazo),0) into ultimo_rechazo from rechazo r1;
+		insert into rechazo values(ultimo_rechazo+1, nrotarjeta_, nrocomercio_, current_date, monto_, 'la tarjeta se encuentra suspendida');
+		return false;
+	elsif datos_tarjeta.codseguridad != codseguridad_ then
+		select coalesce(max(r1.nrorechazo),0) into ultimo_rechazo from rechazo r1;
+		insert into rechazo values(ultimo_rechazo+1, nrotarjeta_, nrocomercio_, current_date, monto_, 'código de seguridad inválido');
+		return false;
+	elsif ((select sum(monto) from compra c1 where c1.nrotarjeta = nrotarjeta_ and c1.pagado is false)+ monto_) > datos_tarjeta.limitecompra then
+		select coalesce(max(r1.nrorechazo),0) into ultimo_rechazo from rechazo r1;
+		insert into rechazo values(ultimo_rechazo+1, nrotarjeta_, nrocomercio_, current_date, monto_, 'supera limite de tarjeta');
+		return false;
+	elsif to_date(datos_tarjeta.validahasta,'yyyymm') < current_date then
+		select coalesce(max(r1.nrorechazo),0) into ultimo_rechazo from rechazo r1;
+		insert into rechazo values(ultimo_rechazo+1, nrotarjeta_, nrocomercio_, current_date, monto_, 'plazo de vigencia expirado');
+		return false;	
+	end if;
+	return true;
+		
+end;
+$$ language plpgsql;
+
+CREATE OR REPLACE FUNCTION alerta_rechazo()
+  RETURNS trigger AS
+$$
+DECLARE
+	ultima_alerta int;
+	rechazo_anterior record;
+BEGIN
+	select * into rechazo_anterior from rechazo r1 where DATE_TRUNC('day',r1.fecha) = DATE_TRUNC('day', NEW.fecha) and r1.nrotarjeta = NEW.nrotarjeta and r1.nrorechazo != NEW.nrorechazo;
+	if found and rechazo_anterior.motivo = 'supera limite de tarjeta' and NEW.motivo = 'supera limite de tarjeta' then 
+		UPDATE tarjeta SET estado = 'suspendida' WHERE nrotarjeta = NEW.nrotarjeta;
+		select coalesce(max(a1.nroalerta),0) into ultima_alerta from alerta a1;
+		INSERT INTO alerta values(ultima_alerta+1, NEW.nrotarjeta, NEW.fecha, NEW.nrorechazo, 32, 'bloqueo de tarjeta');	
+	    RETURN NEW;
+	else
+		if NEW.motivo != 'supera limite de compras en un minuto' and  NEW.motivo != 'supera limite de compras en 5 minutos' then
+			select coalesce(max(a1.nroalerta),0) into ultima_alerta from alerta a1;
+			INSERT INTO alerta values(ultima_alerta+1, NEW.nrotarjeta, NEW.fecha, NEW.nrorechazo,0, 'rechazo');	
+	    	RETURN NEW;
+	    end if;
+	    RETURN NEW;
+	end if;
+END;
+$$
+LANGUAGE 'plpgsql';
+
+CREATE TRIGGER alerta_trigger_rechazo
+  AFTER INSERT
+  ON rechazo
+  FOR EACH ROW
+  EXECUTE PROCEDURE alerta_rechazo();
+
+CREATE OR REPLACE FUNCTION alerta_compra()
+RETURNS trigger AS
+$$
+DECLARE
+	ultima_alerta int;
+	ultimo_rechazo int;
+	compra_anterior record;
+BEGIN
+	select * into compra_anterior from compra c1 where c1.nrotarjeta = NEW.nrotarjeta and NEW.nrocomercio != c1.nrocomercio  order by c1.fecha desc limit 1; 
+	if found then
+		if EXTRACT(MINUTE from (NEW.fecha - compra_anterior.fecha)) = 0 and EXTRACT(SECOND from (NEW.fecha - compra_anterior.fecha)) < 60  and 
+		    (select codigopostal from comercio where nrocomercio = compra_anterior.nrocomercio) = (select codigopostal from comercio where nrocomercio = NEW.nrocomercio) then		   
+			select coalesce(max(a1.nroalerta),0) into ultima_alerta from alerta a1; 
+			INSERT INTO alerta values(ultima_alerta+1, NEW.nrotarjeta, NEW.fecha, ultimo_rechazo+1, 1, 'compra lapso menor a 1min');	
+			RETURN NEW;
+		elsif EXTRACT(MINUTE from (NEW.fecha - compra_anterior.fecha)) < 5 and
+		(select codigopostal from comercio where nrocomercio = compra_anterior.nrocomercio) != (select codigopostal from comercio where nrocomercio = NEW.nrocomercio) then		  
+			select coalesce(max(a1.nroalerta),0) into ultima_alerta from alerta a1; 
+			INSERT INTO alerta values(ultima_alerta+1, NEW.nrotarjeta, NEW.fecha, ultimo_rechazo+1, 5, 'compra lapso menor a 5min');	
+			RETURN NEW;	
+		end if;
+		RETURN NEW;
+	end if;
+	RETURN NEW;
+END;
+$$
+LANGUAGE 'plpgsql';
+
+CREATE TRIGGER alerta_trigger_compra
+  BEFORE INSERT
+  ON compra
+  FOR EACH ROW
+  EXECUTE PROCEDURE alerta_compra();
+
+create or replace function gen_resumen(nrocliente_actual int, periodo char) returns void as $$
+declare
+
+	v record;
+	compras_cliente record;
+	periodo_cierre record;
+	ultimo_cabecera int;
+	ultimo_detalle int;
+	monto_total decimal(7,2);
+	
+begin
+	monto_total := 0.00;
+
+	select coalesce(max(nroresumen),0) into ultimo_cabecera from cabecera;
+	ultimo_cabecera := ultimo_cabecera + 1;
+	insert into cabecera values (ultimo_cabecera,null,null,null,null,null,null,null,null);
+	for v in select *,com.nombre as nombrecomercio  from cliente c, tarjeta t, compra co, comercio com  where c.nrocliente = nrocliente_actual and c.nrocliente = t.nrocliente and t.nrotarjeta = co.nrotarjeta and co.nrocomercio = com.nrocomercio loop
+		select * into periodo_cierre from cierre c where c.terminacion = cast(substring(v.nrotarjeta,16,1) as int) and cast(substring(periodo,1,4) as int) = c.año and cast(substring(periodo,5,2) as int) = c.mes;
+		if v.fecha >= periodo_cierre.fechainicio and v.fecha <= periodo_cierre.fechacierre then
+			select coalesce(max(nrolinea),0) into ultimo_detalle from detalle;
+			insert into detalle values(ultimo_cabecera,ultimo_detalle+1,v.fecha,v.nombrecomercio,v.monto);
+			update compra set pagado = true where nrotarjeta = v.nrotarjeta;
+			monto_total := monto_total + v.monto;
+		end if;
+	end loop;
+
+	update cabecera set total = monto_total, nombre= v.nombre, apellido=v.apellido, domicilio = v.domicilio, nrotarjeta = v.nrotarjeta, desde = periodo_cierre.fechainicio, hasta = periodo_cierre.fechacierre, vence = periodo_cierre.fechavto where nroresumen = ultimo_cabecera;	
+
+end;
+
+$$ language plpgsql;`)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			fmt.Printf("\n------------- SP Y TRIGGERS CREADOS -------------\n")
+		}
+
+	}
+}
+----
+
+.autorizar_compra():
+En cuanto a como funcionan estos stored procedures, para la funcion autorizar_compra, primero se cuenta con los datos de los consumos los cuales se deben ingresar por parametro 
+en la funcion, se van recorriendo uno por uno y en cada uno se analiza si este es aprobado o rechazado, si el consumo es valido entonces se genera una compra y si 
+es invalido entonces se genera un rechazo. Para verificar esto, se pasa por varios condicionales, se comprueba si el estado de la tarjeta es "anulada" o "suspendida", tambien 
+se comprueba si el codigo de seguridad es invalido, se comprueba que la suma de los montos de la tarjeta mas el monto de este consumo no supere el limite de compra 
+de la tarjeta, y tambien se verifica si el plazo de vigencia de la tarjeta esta expirado, si alguna de estas se cumple entonces se crea un nuevo rechazo 
+insertandolo en la tabla y con sus respectivos datos y motivo. Si ninguna de esas se cumple entonces la funcion devuelve true y el consumo es valido, entonces se 
+inserta la informacion correspondiente en la tabla compra.
+
+.alerta_rechazo():
+Con respecto a esta funcion, es llamada en un trigger en la insercion de un registro en la tabla de rechazo, esta misma valida si el rechazo es por exceso de limite y ya existe otro con el mismo motivo en el mismo dia entonces se cambia el estado de la tarjeta a suspendida y se genera la alerta sobre este cambio. Por 
+otro lado si el rechazo no es por esto, se genera una alerta normal que informe la generacion de un rechazo.
+
+.alerta_compra():
+En esta funcion se valida la insercion de compras, donde si se registra ingresos en la tabla compra en menos de un minuto por parte de la misma tarjeta en dos comercios distintos con el mismo codigo postal se genera una alerta que informe sobre este acontecimiento.
+Sin embargo si las compras son en el lapso de 5 minutos pero es en comercios con diferentes codigos postales, tambien se genera una alerta con distinto mensaje.
+
+.gen_resumen():
+Esta funcion recibe como parametro un numero de cliente y un periodo y genera un resumen de todas las compras que se hayan hecho con las tarjetas de ese cliente en el periodo indicado, generando un registro en la tabla cabecera y los registros correspondientes en la tabla detalle.
+
+
+
+=== Archivo generarCompras.go
+En este archivo se llama a la funcion "GenerarCompras()" la cual se encarga de conectarse a la base, crear y ejecutar una funcion en sql "generarCompras()".
+
+[source, go]
+
+----
+func GenerarCompras() {
+	db, err := sql.Open("postgres", "user=postgres host=localhost dbname=gestiontarjetas sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		_, err := db.Exec(`
+		create or replace function generarCompras() returns void as $$ 
+		declare
+			c record;
+		begin
+			for c in select * from consumo
+				loop
+					if (select autorizar_compra(c.nrotarjeta,c.codseguridad,c.nrocomercio,c.monto)) = true then
+						insert into compra values((select coalesce(max(nrooperacion),0)+1 from compra),c.nrotarjeta,c.nrocomercio,current_timestamp,c.monto,false);
+					end if;	
+				end loop;						
+				return;
+		end;
+		$$language plpgsql;
+
+		select generarCompras();
+		`)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			fmt.Printf("\n------------- COMPRAS GENERADAS -------------\n")
+		}
+
+	}
+}
+----
+En cuanto a la funcion en sql "generarCompras()", esta se encarga de recorrer la tabla consumo y a partir de estos crear compras luego de validar con la funcion "autorizar_compra()" que esta sea valida.
+
+=== Archivo generarResumen.go
+En este archivo se llama a la funcion "GenerarResumenes()" la cual se encarga de conectarse a la base y ejecutar tres veces la funcion "gen_resumen()" en sql y de esta forma generar tres resumenes de compras.
+
+[source, go]
+
+----
+func GenerarResumenes() {
+	db, err := sql.Open("postgres", "user=postgres host=localhost dbname=gestiontarjetas sslmode=disable")
+	if err != nil {
+		log.Fatal(err)
+	} else {
+		_, err := db.Exec(`
+			select gen_resumen(30878666,'202111');
+			select gen_resumen(94538755,'202111');
+			select gen_resumen(17305474,'202111');
+		`)
+		if err != nil {
+			log.Fatal(err)
+		} else {
+			fmt.Printf("\n------------- RESUMENES GENERADAS -------------\n")
+		}
+
+	}
+}
+----
+
+=== Archivo bdNosql.go
+En este archivo se encuentra la funcion CrearDB() la cual crea la base de datos NoSQL y luego realiza la carga de los datos de clientes, tarjetas, comercios y compras, y luego a esos datos se le realiza el Marshaling para pasarlos de go a json y se guardan en las variables data. Para guardar esos datos se hizo uso de structs. Luego se llama a la funcion CreateUpdate para realizar la transaccion de escritura en los buckets. Luego se llama a la funcion ReadAll la cual realiza la transaccion de lectura sobre todos los datos del bucket y los muestra en la consola.
+
+[source, go]
+
+----
+
+func CrearDB() {
+	db, err := bolt.Open("bdNosql.db", 0600, nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
+	tiempo := time.Now()
+	current_timestamp := tiempo.Format("01-02-2006 15:04:05")
+
+	cliente := Cliente{30878666, "Juan", "Perez", "Av. Siempreviva 123", "11-6543-5234"}
+	cliente2 := Cliente{20638426, "Sol", "Perez", "Av. Siempreviva 123", "11-6543-5234"}
+	cliente3 := Cliente{10673266, "Marcos", "Perez", "Av. Siempreviva 123", "11-6543-5234"}
+	dataCliente, err := json.Marshal(cliente)
+	dataCliente2, err := json.Marshal(cliente2)
+	dataCliente3, err := json.Marshal(cliente3)
+
+	tarjeta := Tarjeta{"5449981007097362", 30878666, "201812", "202312", "0810", 80000.00, "vigente"}
+	tarjeta2 := Tarjeta{"5215587392715740", 30878666, "201212", "202112", "0546", 8000.00, "anulada"}
+	tarjeta3 := Tarjeta{"4927053520951527", 86734897, "202101", "202701", "0521", 10000.00, "suspendida"}
+	dataTarjeta, err := json.Marshal(tarjeta)
+	dataTarjeta2, err := json.Marshal(tarjeta2)
+	dataTarjeta3, err := json.Marshal(tarjeta3)
+
+	comercio := Comercio{1, "Maxikiosco 365", "Int.Becco 458", "B1611FDA", "11-4741-7580"}
+	comercio2 := Comercio{2, "Farmacia 24hs", "Av.Angel T. de Alvear 3250", "B1611FDA", "11-4723-9250"}
+	comercio3 := Comercio{3, "Supermercado Lo de Claudio", "Formosa 1967", "B1619FDB", "11-4845-6594"}
+	dataComercio, err := json.Marshal(comercio)
+	dataComercio2, err := json.Marshal(comercio2)
+	dataComercio3, err := json.Marshal(comercio3)
+
+	compra := Compra{1, "5449981007097362", 1, current_timestamp, 6000, false}
+	compra2 := Compra{2, "5215587392715740", 2, current_timestamp, 10000, false}
+	compra3 := Compra{3, "4927053520951527", 3, current_timestamp, 20, false}
+	dataCompra, err := json.Marshal(compra)
+	dataCompra2, err := json.Marshal(compra2)
+	dataCompra3, err := json.Marshal(compra3)
+
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	CreateUpdate(db, "Cliente", []byte(strconv.Itoa(cliente.Nrocliente)), dataCliente)
+	CreateUpdate(db, "Cliente", []byte(strconv.Itoa(cliente2.Nrocliente)), dataCliente2)
+	CreateUpdate(db, "Cliente", []byte(strconv.Itoa(cliente3.Nrocliente)), dataCliente3)
+	CreateUpdate(db, "Tarjeta", []byte(tarjeta.Nrotarjeta), dataTarjeta)
+	CreateUpdate(db, "Tarjeta", []byte(tarjeta2.Nrotarjeta), dataTarjeta2)
+	CreateUpdate(db, "Tarjeta", []byte(tarjeta3.Nrotarjeta), dataTarjeta3)
+	CreateUpdate(db, "Comercio", []byte(strconv.Itoa(comercio.Nrocomercio)), dataComercio)
+	CreateUpdate(db, "Comercio", []byte(strconv.Itoa(comercio2.Nrocomercio)), dataComercio2)
+	CreateUpdate(db, "Comercio", []byte(strconv.Itoa(comercio3.Nrocomercio)), dataComercio3)
+	CreateUpdate(db, "Compra", []byte(strconv.Itoa(compra.Nrooperacion)), dataCompra)
+	CreateUpdate(db, "Compra", []byte(strconv.Itoa(compra2.Nrooperacion)), dataCompra2)
+	CreateUpdate(db, "Compra", []byte(strconv.Itoa(compra3.Nrooperacion)), dataCompra3)
+
+	ReadAll(db,"Cliente")
+	ReadAll(db,"Tarjeta")
+	ReadAll(db,"Comercio")
+	ReadAll(db,"Compra")
+
+}
+
+----
+
+== Conclusiones
+Si bien durante la cursada se abordaron varios temas teóricos que a simple vista parece que no se van a utilizar, al momento de la creacion y manipulación de esta BDD nos percatamos de que es necesario tener internalizados muchos de los conceptos enseñados para manipular una base de datos correctamente. Por ejemplo, el concepto de entidad para poder entender cómo se relacionan varias tablas distintas.
+
+En el producto final se puede observar como una base de datos relacional modelada correctamente puede reducir considerablemente el esfuerzo necesario para crear y mantener una aplicación, ya que los PK, FK, SP y triggers se encargan de mantener los datos perfectamente organizados y realizar parte de la lógica de negocio.
+
+También podemos observar que si el flujo de datos no es muy voluminoso (no es el caso de este trabajo ya que una compañía de tarjetas de crédito tendría miles de clientes) una base de datos no relacional resulta más conveniente.
+
